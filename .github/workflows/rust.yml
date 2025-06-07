@@ -67,5 +67,5 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3 # 使用GitHub Actions部署文档
         with: # 部署配置
           github_token: ${{ secrets.GITHUB_TOKEN }} # 使用GitHub令牌
-          publish_dir: ./target/doc # 文档目录
+          publish_dir: ./target/doc/zero2prod # 文档目录
           publish_branch: gh-pages # 发布到的分支
