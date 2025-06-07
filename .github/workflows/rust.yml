@@ -33,6 +33,16 @@ jobs:
         # 运行Clippy检查并拒绝所有警告(警告会导致任务失败)
         run: cargo clippy -- -D warnings
 
+  # 安全审计任务
+  audit:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+      - name: Audit dependencies
+        run: cargo audit
+
   # 构建和测试任务
   build:
     runs-on: windows-latest
@@ -47,7 +57,8 @@ jobs:
     # 文档生成和部署
   docs:
     runs-on: windows-latest
-
+    permissions: # 权限配置
+      contents: write # 授予写入权限
     steps:
       - uses: actions/checkout@v4
       - name: Build docs
