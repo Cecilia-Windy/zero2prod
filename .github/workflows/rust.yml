@@ -1,22 +1,60 @@
+# 工作流名称
 name: Rust
 
+# 触发条件配置
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  push: # 代码推送时触发
+    branches: ["main"] # 仅监控main分支
+  pull_request: # 创建Pull Request时触发
+    branches: ["main"] # 仅监控针对main分支的PR
 
+# 全局环境变量
 env:
-  CARGO_TERM_COLOR: always
+  CARGO_TERM_COLOR: always # 强制Cargo输出带颜色
 
+# 定义的工作任务
 jobs:
-  build:
-
-    runs-on: ubuntu-latest
+  # 代码格式化
+  fmt:
+    runs-on: windows-latest # 使用Windows运行环境
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+      - uses: actions/checkout@v4 # 检出仓库代码
+      - name: Format
+        run: cargo fmt # 代码格式化
+
+  # Rust代码静态分析检查
+  clippy:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clippy
+        # 运行Clippy检查并拒绝所有警告(警告会导致任务失败)
+        run: cargo clippy -- -D warnings
+
+  # 构建和测试任务
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: cargo build --verbose # 详细模式构建项目
+      - name: Run tests
+        run: cargo test --verbose # 详细模式运行所有测试
+
+    # 文档生成和部署
+  docs:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build docs
+        run: cargo doc --no-deps # 构建文档，不依赖其他包
+      - name: Deploy docs
+        uses: peaceiris/actions-gh-pages@v3 # 使用GitHub Actions部署文档
+        with: # 部署配置
+          github_token: ${{ secrets.GITHUB_TOKEN }} # 使用GitHub令牌
+          publish_dir: ./target/doc # 文档目录
+          publish_branch: gh-pages # 发布到的分支
