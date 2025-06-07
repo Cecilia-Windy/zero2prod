@@ -63,17 +63,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build docs
         run: cargo doc --no-deps
-      - name: Create redirect index  # 重定向到文档目录
+      - name: Create redirect index # 重定向到文档目录
         run: |
-          echo '<!DOCTYPE html>
-          <html>
-          <head>
-            <meta http-equiv="refresh" content="0; url=./zero2prod/index.html" />
-          </head>
-          <body>
-            <p>Redirecting to <a href="./zero2prod/index.html">documentation</a>...</p>
-          </body>
-          </html>' > ./target/doc/index.html
+          echo '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0; url=./zero2prod/index.html" /></head><body bgcolor="#3f3f3f"><body></html>' > ./target/doc/index.html
 
       - name: Deploy docs
         uses: peaceiris/actions-gh-pages@v3
