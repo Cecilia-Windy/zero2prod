@@ -1,1 +1,1 @@
-searchState.loadedDescShard("zero2prod", 0, "zero2prod\nA simple program that prints “Hello, world!”")
+searchState.loadedDescShard("zero2prod", 0, "src/lib.rs")

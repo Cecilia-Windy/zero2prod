@@ -1,3 +1,3 @@
-var srcIndex = new Map(JSON.parse('[["zero2prod",["",[],["main.rs"]]]]'));
+var srcIndex = new Map(JSON.parse('[["zero2prod",["",[],["lib.rs"]]]]'));
 createSrcSidebar();
-//{"start":36,"fragment_lengths":[33]}
+//{"start":36,"fragment_lengths":[32]}
