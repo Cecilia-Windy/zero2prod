@@ -1,20 +1,24 @@
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::TcpListener;
 use uuid::Uuid;
-use zero2prod::configuration::{get_configuration, DatabaseSettings};
+use zero2prod::configuration::{DatabaseSettings, get_configuration};
 use zero2prod::startup::run;
 
 pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
+    pub db_name: String,
+    pub db_config: DatabaseSettings,
 }
 
 async fn spawn_app() -> TestApp {
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
-    let address = listener.local_addr().unwrap().to_string();
+    let port = listener.local_addr().unwrap().port();
+    let address = format!("http://127.0.0.1:{}", port);
 
     let mut configuration = get_configuration().expect("Failed to read configuration.");
-    configuration.database.database_name = Uuid::new_v4().to_string();
+    let db_name = Uuid::new_v4().to_string();
+    configuration.database.database_name = db_name.clone();
     let connection_pool = configure_database(&configuration.database).await;
 
     let server = run(listener, connection_pool.clone()).expect("Failed to run application");
@@ -23,6 +27,39 @@ async fn spawn_app() -> TestApp {
     TestApp {
         address,
         db_pool: connection_pool,
+        db_name,
+        db_config: configuration.database,
+    }
+}
+
+impl TestApp {
+    async fn cleanup(&mut self) {
+        // 关闭连接池以释放所有连接
+        self.db_pool.close().await;
+
+        // 连接到默认数据库以删除测试数据库
+        let mut connection = PgConnection::connect(&self.db_config.connection_string_without_db())
+            .await
+            .expect("Failed to connect to Postgres for cleanup");
+
+        // 终止所有连接到测试数据库的会话
+        sqlx::query(
+            r#"
+            SELECT pg_terminate_backend(pid)
+            FROM pg_stat_activity
+            WHERE datname = $1 AND pid <> pg_backend_pid()
+            "#,
+        )
+        .bind(&self.db_name)
+        .execute(&mut connection)
+        .await
+        .expect("Failed to terminate existing connections");
+
+        // 删除测试数据库
+        connection
+            .execute(format!(r#"DROP DATABASE "{}";"#, &self.db_name).as_str())
+            .await
+            .expect("Failed to drop database");
     }
 }
 
@@ -31,7 +68,8 @@ pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
     let mut connection = PgConnection::connect(&config.connection_string_without_db())
         .await
         .expect("Failed to connect to Postgres");
-    connection.execute(format!(r#"CREATE DATABASE "{}";"#, &config.database_name).as_str())
+    connection
+        .execute(format!(r#"CREATE DATABASE "{}";"#, &config.database_name).as_str())
         .await
         .expect("Failed to create database");
 
@@ -50,7 +88,7 @@ pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
 #[tokio::test]
 async fn health_check_works() {
     // 准备
-    let app = spawn_app().await;
+    let mut app = spawn_app().await;
     let client = reqwest::Client::new();
 
     // 执行
@@ -63,12 +101,14 @@ async fn health_check_works() {
     // 断言
     assert!(response.status().is_success());
     assert_eq!(Some(0), response.content_length());
+
+    app.cleanup().await;
 }
 
 #[tokio::test]
 async fn subscribe_returns_a_200_for_valid_form_data() {
     // 准备
-    let app = spawn_app().await;
+    let mut app = spawn_app().await;
     let client = reqwest::Client::new();
 
     // 执行
@@ -91,12 +131,14 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
 
     assert_eq!(saved.email, "ursula_le_guin@gmail.com");
     assert_eq!(saved.name, "le guin");
+
+    app.cleanup().await;
 }
 
 #[tokio::test]
 async fn subscribe_returns_a_400_when_data_is_missing() {
     // 准备
-    let app = spawn_app().await;
+    let mut app = spawn_app().await;
     let client = reqwest::Client::new();
     let test_cases = vec![
         ("name=le%20guin", "missing the email"),
@@ -123,4 +165,6 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
             error_message
         );
     }
+
+    app.cleanup().await;
 }
