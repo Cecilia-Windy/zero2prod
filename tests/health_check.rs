@@ -1,8 +1,28 @@
+use once_cell::sync::Lazy;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
+use std::io::{sink, stdout};
 use std::net::TcpListener;
 use uuid::Uuid;
-use zero2prod::configuration::{DatabaseSettings, get_configuration};
+use zero2prod::configuration::{get_configuration, DatabaseSettings};
 use zero2prod::startup::run;
+use zero2prod::telemetry::{get_subscriber, init_subscriber};
+
+static TRACING: Lazy<()> = Lazy::new(|| {
+    let default_filter_level = "info".to_string();
+    let subscriber_name = "test".to_string();
+
+    // 根据TEST_LOG决定是否输出test日志
+    match std::env::var("TEST_LOG") {
+        Ok(var) if var.to_lowercase() == "true" => {
+            let subscriber = get_subscriber(subscriber_name, default_filter_level, stdout);
+            init_subscriber(subscriber);
+        }
+        _ => {
+            let subscriber = get_subscriber(subscriber_name, default_filter_level, sink);
+            init_subscriber(subscriber);
+        }
+    }
+});
 
 pub struct TestApp {
     pub address: String,
@@ -12,6 +32,10 @@ pub struct TestApp {
 }
 
 async fn spawn_app() -> TestApp {
+    // 只有第一次调用会执行
+    // 后续调用会直接跳过
+    Lazy::force(&TRACING);
+
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
     let port = listener.local_addr().unwrap().port();
     let address = format!("http://127.0.0.1:{}", port);
